@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Body, APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from Services.CAService import CAService
+from app.Services.CAService import CAService
 
 from models.exemplosRequest import ExemplosRequest
 from models.requestParaExportarArquivo import RequestParaExportarArquivo
