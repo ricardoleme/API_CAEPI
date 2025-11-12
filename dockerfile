@@ -16,4 +16,4 @@ COPY . .
 
 # Render define a variável PORT automaticamente (ex: 10000)
 # O comando abaixo garante compatibilidade
-CMD exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}
+CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
