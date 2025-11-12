@@ -1,6 +1,6 @@
 from fastapi import Depends, FastAPI
 import uvicorn
-from routers import certificadoApovacao
+from app.routers import certificadoApovacao
 
 from fastapi.middleware.cors import CORSMiddleware
 
