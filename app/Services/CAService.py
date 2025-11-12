@@ -1,4 +1,4 @@
-from Services.BaseDadosCaEPI import BaseDadosCaEPI;
+from app.Services.BaseDadosCaEPI import BaseDadosCaEPI;
 import io
 import pandas as pd
 from apscheduler.schedulers.background import BackgroundScheduler
