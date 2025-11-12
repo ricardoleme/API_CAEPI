@@ -5,11 +5,11 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.Services.CAService import CAService
 
-from models.exemplosRequest import ExemplosRequest
-from models.requestParaExportarArquivo import RequestParaExportarArquivo
-from models.requestParaExportarJson import RequestParaExportarJson
-from models.infoCADto import InfoCADto
-from models.responsesModels import ResponsesModels
+from app.models.exemplosRequest import ExemplosRequest
+from app.models.requestParaExportarArquivo import RequestParaExportarArquivo
+from app.models.requestParaExportarJson import RequestParaExportarJson
+from app.models.infoCADto import InfoCADto
+from app.models.responsesModels import ResponsesModels
 
 router = APIRouter(tags=["Certificado de Aprovação"])
 caService  = CAService()
