@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: api-base-caepi
+    env: python
+    plan: free
+    buildCommand: pip install --upgrade pip setuptools wheel && pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+    autoDeploy: true
