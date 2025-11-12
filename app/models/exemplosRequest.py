@@ -1,5 +1,5 @@
-from models.requestParaExportarArquivo import RequestParaExportarArquivo
-from models.requestParaExportarJson import RequestParaExportarJson
+from app.models.requestParaExportarArquivo import RequestParaExportarArquivo
+from app.models.requestParaExportarJson import RequestParaExportarJson
 
 
 class ExemplosRequest():
