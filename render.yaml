@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: api-base-caepi
+    name: api-caepi
     env: docker
     plan: free
     dockerfilePath: ./Dockerfile
