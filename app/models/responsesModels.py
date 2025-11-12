@@ -1,5 +1,5 @@
-from models.Erros import Erros
-from models.CAsNaoEncontrados import CAsNaoEncontrados
+from app.models.Erros import Erros
+from app.models.CAsNaoEncontrados import CAsNaoEncontrados
 
 from fastapi.responses import JSONResponse
 
