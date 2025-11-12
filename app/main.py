@@ -19,8 +19,12 @@ app = FastAPI(
     )
 
 origins = [
-    "http://localhost:4200",
+    "http://localhost:4200",                 # para testes locais
+    "https://epi-semitronic.vercel.app",     # domínio do frontend
+    "https://api-basecaepi.onrender.com"     # domínio do backend, se necessário
+    "https://v0.app/chat/epi-delivery-system-kbyJLWyB1q9" #v0
 ]
+
 
 app.add_middleware(
     CORSMiddleware,
