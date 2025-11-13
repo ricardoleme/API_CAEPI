@@ -42,21 +42,51 @@ class BaseDadosCaEPI:
         self = self
 
     def _baixarArquivoBaseCaEPI(self):
+        # Nome do arquivo ZIP remoto
+        nomeArquivoZip = 'tgg_export_caepi.zip'
+        
+        # 1. Remover arquivo local, se existir
         if os.path.exists(self.nomeArquivoBase):
             os.remove(self.nomeArquivoBase)
 
-        ftp = ftplib.FTP(self.urlBase)
-        ftp.login()
-        ftp.cwd(self.caminho)
+        # 2. Conexão e Navegação
+        try:
+            ftp = ftplib.FTP(self.urlBase)
+            ftp.login() # Login anônimo
+            ftp.cwd(self.caminho)
+            
+            # 3. VERIFICAÇÃO DE EXISTÊNCIA
+            # Retorna uma lista dos arquivos no diretório atual
+            lista_arquivos = ftp.nlst() 
+            
+            if nomeArquivoZip not in lista_arquivos:
+                print(f"❌ Erro: O arquivo **{nomeArquivoZip}** não foi encontrado no diretório **{self.caminho}**.")
+                # Levanta um erro ou retorna para interromper o processo
+                raise FileNotFoundError(f"Arquivo {nomeArquivoZip} não encontrado no FTP.") 
 
-        nomeArquivoZip = 'tgg_export_caepi.zip'
-        r = io.BytesIO()
-
-        ftp.retrbinary(f'RETR {nomeArquivoZip}', r.write)
-
-        arquivoZip = zipfile.ZipFile(r)
-
-        arquivoZip.extractall()
+            # 4. Download
+            r = io.BytesIO()
+            print(f"✅ Arquivo {nomeArquivoZip} encontrado. Iniciando download...")
+            ftp.retrbinary(f'RETR {nomeArquivoZip}', r.write)
+            ftp.quit() # Fechar a conexão
+            
+            # 5. Extração
+            arquivoZip = zipfile.ZipFile(r)
+            arquivoZip.extractall()
+            
+            print("Download e extração concluídos.")
+            
+        except ftplib.all_errors as e:
+            # Captura erros de FTP (conexão, permissão, etc.)
+            print(f"🚨 Erro durante a conexão ou operação FTP: {e}")
+            raise 
+        except FileNotFoundError:
+            # Re-lança o erro de arquivo não encontrado
+            raise
+        except Exception as e:
+            # Captura outros erros, como problemas na extração do ZIP
+            print(f"🚨 Ocorreu um erro inesperado: {e}")
+            raise
     
     def _transformarEmDataFrame(self):          
         listaCas = self._retornarCAsSemErros()
@@ -120,8 +150,3 @@ class BaseDadosCaEPI:
 
         self._transformarEmDataFrame()
         return self.baseDadosDF
-
-    
-
-
-   
