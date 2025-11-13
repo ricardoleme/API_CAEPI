@@ -42,26 +42,24 @@ class BaseDadosCaEPI:
         self = self
 
     def _baixarArquivoBaseCaEPI(self):
-        # Nome do arquivo ZIP remoto
         nomeArquivoZip = 'tgg_export_caepi.zip'
         
         # 1. Remover arquivo local, se existir
         if os.path.exists(self.nomeArquivoBase):
             os.remove(self.nomeArquivoBase)
 
-        # 2. Conexão e Navegação
         try:
+            # 2. Conexão e Navegação
             ftp = ftplib.FTP(self.urlBase)
             ftp.login() # Login anônimo
             ftp.cwd(self.caminho)
             
-            # 3. VERIFICAÇÃO DE EXISTÊNCIA
-            # Retorna uma lista dos arquivos no diretório atual
+            # 3. VERIFICAÇÃO DE EXISTÊNCIA (nlst)
             lista_arquivos = ftp.nlst() 
             
             if nomeArquivoZip not in lista_arquivos:
                 print(f"❌ Erro: O arquivo **{nomeArquivoZip}** não foi encontrado no diretório **{self.caminho}**.")
-                # Levanta um erro ou retorna para interromper o processo
+                # Lança exceção para interromper o processo
                 raise FileNotFoundError(f"Arquivo {nomeArquivoZip} não encontrado no FTP.") 
 
             # 4. Download
@@ -70,32 +68,51 @@ class BaseDadosCaEPI:
             ftp.retrbinary(f'RETR {nomeArquivoZip}', r.write)
             ftp.quit() # Fechar a conexão
             
-            # 5. Extração
+            # 5. VERIFICAÇÃO DE DOWNLOAD VAZIO (resolve BadZipFile)
+            if r.tell() == 0:
+                print("🚨 Erro: O download do arquivo ZIP resultou em um arquivo vazio (0 bytes).")
+                raise IOError("Download do arquivo ZIP vazio. Verifique permissões ou conexão.")
+            
+            # Volta o ponteiro para o início do buffer para leitura do ZIP
+            r.seek(0)
+
+            # 6. Extração
             arquivoZip = zipfile.ZipFile(r)
             arquivoZip.extractall()
             
             print("Download e extração concluídos.")
             
         except ftplib.all_errors as e:
-            # Captura erros de FTP (conexão, permissão, etc.)
             print(f"🚨 Erro durante a conexão ou operação FTP: {e}")
             raise 
         except FileNotFoundError:
             # Re-lança o erro de arquivo não encontrado
             raise
+        except zipfile.BadZipFile as e:
+            print(f"🚨 Erro de ZIP: O conteúdo baixado não é um arquivo ZIP válido. Motivo: {e}")
+            raise
         except Exception as e:
-            # Captura outros erros, como problemas na extração do ZIP
             print(f"🚨 Ocorreu um erro inesperado: {e}")
             raise
     
     def _transformarEmDataFrame(self):          
         listaCas = self._retornarCAsSemErros()
+        
+        # Garante que a lista não está vazia (ocorreria se o download falhasse sem exceção)
+        if not listaCas:
+            raise Exception("Não foi possível carregar os dados. A lista de CAs está vazia.")
+            
         cols = listaCas[0]
         self.baseDadosDF = pd.DataFrame(listaCas, columns=cols)        
 
         self.baseDadosDF.columns = self.__retornaNomesColunas()
 
     def __retornaNomesColunas(self):
+        # Abre o arquivo de configuração de nomes de colunas
+        # É importante garantir que este arquivo exista no deploy
+        if not os.path.exists(self.nomeArquivoConfigNomesColunas):
+             raise FileNotFoundError(f"Arquivo de configuração {self.nomeArquivoConfigNomesColunas} não encontrado.")
+             
         arquivo = open(self.nomeArquivoConfigNomesColunas, encoding='UTF-8')
 
         return arquivo.readline().split(',')
@@ -103,6 +120,11 @@ class BaseDadosCaEPI:
     def _retornarCAsSemErros(self) -> list:
         listaCAsValidos = []
         listaCAsInvalidos = []
+        
+        # Verifica se o arquivo base existe localmente antes de tentar ler
+        if not os.path.exists(self.nomeArquivoBase):
+            # Se a função retornarBaseDados foi chamada corretamente, este arquivo deve existir
+            raise FileNotFoundError(f"Arquivo base {self.nomeArquivoBase} não encontrado após o download/extração.")
 
         with open(self.nomeArquivoBase, encoding='UTF-8') as arquivo:
             reader = csv.reader(arquivo, delimiter='|', quotechar='"')
