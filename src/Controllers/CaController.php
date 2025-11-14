@@ -16,7 +16,7 @@ class CaController
 
     public function home(): Response
     {
-        return Response::text('HOME');
+        return Response::text('API de 👷🏼Consulta de CAs - Funcionando! Versão 1.2.0');
     }
 
     public function retornarInfoAtual(Request $request): Response
