@@ -53,6 +53,7 @@ class BaseDadosCaEPI:
             ftp = ftplib.FTP(self.urlBase)
             ftp.login() # Login anônimo
             ftp.cwd(self.caminho)
+            ftp.set_pasv(True)
             
             # 3. VERIFICAÇÃO DE EXISTÊNCIA (nlst)
             lista_arquivos = ftp.nlst() 
