@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use Generator;
 use RuntimeException;
 use ZipArchive;
 
@@ -18,24 +19,17 @@ class BaseDadosCaEpi
     private const COLUMN_COUNT = 19;
     private const SECONDS_TTL = 24 * 60 * 60;
 
-    private ?array $baseDados = null;
-
     public function __construct(private readonly string $rootPath)
     {
     }
 
-    public function retornarBaseDados(): array
+    public function retornarBaseDados(): iterable
     {
         if ($this->precisaAtualizarBase()) {
             $this->baixarArquivoBaseCaEPI();
-            $this->baseDados = null;
         }
 
-        if ($this->baseDados === null) {
-            $this->baseDados = $this->transformarEmArrayAssociativo();
-        }
-
-        return $this->baseDados;
+        return $this->gerarRegistrosAssociativos();
     }
 
     private function precisaAtualizarBase(): bool
@@ -60,25 +54,25 @@ class BaseDadosCaEpi
         @unlink($zipPath);
     }
 
-    private function transformarEmArrayAssociativo(): array
+    private function gerarRegistrosAssociativos(): Generator
     {
-        $linhas = $this->retornarCAsSemErros();
-        if ($linhas === []) {
+        $nomesColunas = $this->retornaNomesColunas();
+        $totalColunas = count($nomesColunas);
+        $conteudoEncontrado = false;
+
+        foreach ($this->retornarCAsSemErros() as $linha) {
+            if (!$conteudoEncontrado && $this->pareceCabecalho($linha)) {
+                continue;
+            }
+
+            $conteudoEncontrado = true;
+            $linha = array_pad($linha, $totalColunas, null);
+            yield array_combine($nomesColunas, $linha);
+        }
+
+        if (!$conteudoEncontrado) {
             throw new RuntimeException('Não foi possível carregar os dados do CAEPI.');
         }
-
-        $nomesColunas = $this->retornaNomesColunas();
-        if ($this->pareceCabecalho($linhas[0])) {
-            array_shift($linhas);
-        }
-
-        $dataset = [];
-        foreach ($linhas as $linha) {
-            $linha = array_pad($linha, count($nomesColunas), null);
-            $dataset[] = array_combine($nomesColunas, $linha);
-        }
-
-        return $dataset;
     }
 
     private function retornaNomesColunas(): array
@@ -102,7 +96,7 @@ class BaseDadosCaEpi
         return $colunas;
     }
 
-    private function retornarCAsSemErros(): array
+    private function retornarCAsSemErros(): Generator
     {
         $arquivoBase = $this->path(self::BASE_FILENAME);
         if (!file_exists($arquivoBase)) {
@@ -114,36 +108,34 @@ class BaseDadosCaEpi
             throw new RuntimeException('Não foi possível abrir o arquivo base.');
         }
 
-        $validos = [];
         $invalidos = [];
 
-        while (($linha = fgets($handle)) !== false) {
-            $linha = rtrim($linha, "\r\n");
-            if ($linha === '') {
-                continue;
-            }
-
-            $colunas = str_getcsv($linha, '|', '"');
-            if (count($colunas) > self::COLUMN_COUNT) {
-                $tratado = $this->tratarCasComErros($linha);
-                if ($tratado['success']) {
-                    $colunas = $tratado['linha'];
-                } else {
-                    $invalidos[] = $linha . PHP_EOL;
+        try {
+            while (($linha = fgets($handle)) !== false) {
+                $linha = rtrim($linha, "\r\n");
+                if ($linha === '') {
                     continue;
                 }
+
+                $colunas = str_getcsv($linha, '|', '"');
+                if (count($colunas) > self::COLUMN_COUNT) {
+                    $tratado = $this->tratarCasComErros($linha);
+                    if ($tratado['success']) {
+                        $colunas = $tratado['linha'];
+                    } else {
+                        $invalidos[] = $linha . PHP_EOL;
+                        continue;
+                    }
+                }
+
+                yield $colunas;
             }
-
-            $validos[] = $colunas;
+        } finally {
+            fclose($handle);
+            if ($invalidos !== []) {
+                $this->criarArquivoComErros($invalidos);
+            }
         }
-
-        fclose($handle);
-
-        if ($invalidos !== []) {
-            $this->criarArquivoComErros($invalidos);
-        }
-
-        return $validos;
     }
 
     private function tratarCasComErros(string $linha): array
