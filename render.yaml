@@ -1,7 +1,0 @@
-services:
-  - type: web
-    name: api-caepi
-    env: docker
-    plan: free
-    dockerfilePath: ./Dockerfile
-    autoDeploy: true

@@ -4,3 +4,7 @@ tgg_export_caepi.txt
 CAs_com_erros.txt
 .vscode
 Todo.md
+vendor/
+composer.phar
+composer-setup.php
+tgg_export_caepi.zip
