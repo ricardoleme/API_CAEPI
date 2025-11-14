@@ -56,6 +56,7 @@ class Application
         try {
             $response = $this->router->dispatch($request);
         } catch (Throwable $throwable) {
+            error_log('[API_CAEPI] ' . $throwable->getMessage());
             $response = Response::json([
                 'success' => false,
                 'errors' => ['Erro interno inesperado. Consulte os logs do servidor.'],

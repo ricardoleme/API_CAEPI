@@ -12,7 +12,7 @@ Esta API expõe consultas rápidas à base pública de Certificados de Aprovaç�
 A API baixa automaticamente o arquivo diário `tgg_export_caepi.zip` via FTP, normaliza a tabela e mantém os campos originais da base.
 
 ## Requisitos
-- PHP **8.1+** com extensões `zip`, `json`, `ftp` (ou `curl` para fallback) habilitadas
+- PHP **8.1+** com extensões `zip`, `json`, `ftp`, `curl` habilitadas
 - [Composer](https://getcomposer.org/) para instalar as dependências (PhpSpreadsheet)
 - Permissão de saída na porta FTP padrão (21) para baixar a base oficial
 

@@ -170,12 +170,39 @@ class BaseDadosCaEpi
 
     private function downloadArquivoZip(string $zipPath): void
     {
+        $erros = [];
+
         if (function_exists('ftp_connect')) {
-            $this->downloadViaExtensaoFtp($zipPath);
-            return;
+            try {
+                $this->downloadViaExtensaoFtp($zipPath);
+                return;
+            } catch (RuntimeException $exception) {
+                $erros[] = $exception->getMessage();
+            }
         }
 
-        $this->downloadViaStream($zipPath);
+        if (function_exists('curl_init')) {
+            try {
+                $this->downloadViaCurl($zipPath);
+                return;
+            } catch (RuntimeException $exception) {
+                $erros[] = $exception->getMessage();
+            }
+        }
+
+        try {
+            $this->downloadViaStream($zipPath);
+            return;
+        } catch (RuntimeException $exception) {
+            $erros[] = $exception->getMessage();
+        }
+
+        $mensagemErro = 'Falha ao baixar o arquivo ZIP do FTP.';
+        if ($erros !== []) {
+            $mensagemErro .= ' Motivos: ' . implode(' | ', $erros);
+        }
+
+        throw new RuntimeException($mensagemErro);
     }
 
     private function downloadViaExtensaoFtp(string $zipPath): void
@@ -213,10 +240,38 @@ class BaseDadosCaEpi
         }
     }
 
+    private function downloadViaCurl(string $zipPath): void
+    {
+        $handle = fopen($zipPath, 'w+');
+        if ($handle === false) {
+            throw new RuntimeException('Não foi possível criar o arquivo ZIP local.');
+        }
+
+        $curl = curl_init($this->buildFtpUrl());
+        curl_setopt_array($curl, [
+            CURLOPT_USERPWD => 'anonymous:anonymous',
+            CURLOPT_FILE => $handle,
+            CURLOPT_FAILONERROR => true,
+            CURLOPT_FTP_USE_EPSV => true,
+            CURLOPT_TIMEOUT => 120,
+            CURLOPT_BUFFERSIZE => 1024 * 1024,
+        ]);
+
+        $resultado = curl_exec($curl);
+        if ($resultado === false) {
+            $erro = curl_error($curl);
+            curl_close($curl);
+            fclose($handle);
+            throw new RuntimeException('Falha ao baixar o arquivo ZIP via cURL: ' . $erro);
+        }
+
+        curl_close($curl);
+        fclose($handle);
+    }
+
     private function downloadViaStream(string $zipPath): void
     {
-        $remotePath = rtrim(self::FTP_PATH, '/');
-        $url = sprintf('ftp://%s/%s/%s', self::FTP_HOST, $remotePath, self::ZIP_FILENAME);
+        $url = $this->buildFtpUrl();
         $context = stream_context_create([
             'ftp' => [
                 'overwrite' => true,
@@ -232,16 +287,88 @@ class BaseDadosCaEpi
     {
         $zip = new ZipArchive();
         $resultado = $zip->open($zipPath);
-        if ($resultado !== true) {
-            throw new RuntimeException('Não foi possível abrir o arquivo ZIP baixado.');
-        }
+        if ($resultado === true) {
+            if ($zip->extractTo($this->rootPath)) {
+                $zip->close();
+                return;
+            }
 
-        if (!$zip->extractTo($this->rootPath)) {
             $zip->close();
-            throw new RuntimeException('Falha ao extrair o arquivo ZIP.');
         }
 
-        $zip->close();
+        $this->extrairZipSemIndiceCentral($zipPath);
+    }
+
+    private function extrairZipSemIndiceCentral(string $zipPath): void
+    {
+        $conteudo = file_get_contents($zipPath);
+        if ($conteudo === false) {
+            throw new RuntimeException('Não foi possível ler o arquivo ZIP baixado.');
+        }
+
+        if (!str_starts_with($conteudo, "PK\x03\x04")) {
+            throw new RuntimeException('Formato ZIP inválido retornado pelo FTP.');
+        }
+
+        if (strlen($conteudo) < 30) {
+            throw new RuntimeException('Cabeçalho ZIP incompleto.');
+        }
+
+        $nomeArquivoLength = @unpack('v', substr($conteudo, 26, 2));
+        $extraLength = @unpack('v', substr($conteudo, 28, 2));
+        if (!isset($nomeArquivoLength[1], $extraLength[1])) {
+            throw new RuntimeException('Não foi possível ler o cabeçalho ZIP.');
+        }
+
+        $offsetDados = 30 + (int) $nomeArquivoLength[1] + (int) $extraLength[1];
+        if ($offsetDados >= strlen($conteudo)) {
+            throw new RuntimeException('Conteúdo ZIP inválido.');
+        }
+
+        $inflator = inflate_init(ZLIB_ENCODING_RAW);
+        if ($inflator === false) {
+            throw new RuntimeException('Não foi possível inicializar o inflator ZIP.');
+        }
+
+        $destino = fopen($this->path(self::BASE_FILENAME), 'wb');
+        if ($destino === false) {
+            throw new RuntimeException('Não foi possível criar o arquivo base.');
+        }
+
+        $cursor = $offsetDados;
+        $tamanho = strlen($conteudo);
+        $concluido = false;
+
+        try {
+            while ($cursor < $tamanho) {
+                $chunk = substr($conteudo, $cursor, 1 << 20);
+                if ($chunk === '') {
+                    break;
+                }
+
+                $cursor += strlen($chunk);
+                $flush = $cursor >= $tamanho ? ZLIB_FINISH : ZLIB_NO_FLUSH;
+                $decompresso = inflate_add($inflator, $chunk, $flush);
+                if ($decompresso === false) {
+                    throw new RuntimeException('Falha ao descompactar o arquivo ZIP sem índice central.');
+                }
+
+                if ($decompresso !== '') {
+                    fwrite($destino, $decompresso);
+                }
+
+                if ($flush === ZLIB_FINISH) {
+                    $concluido = true;
+                    break;
+                }
+            }
+        } finally {
+            fclose($destino);
+        }
+
+        if (!$concluido) {
+            throw new RuntimeException('Fim inesperado ao processar o ZIP sem índice central.');
+        }
     }
 
     private function path(string $arquivo): string
@@ -255,5 +382,11 @@ class BaseDadosCaEpi
         if (file_exists($caminho)) {
             @unlink($caminho);
         }
+    }
+
+    private function buildFtpUrl(): string
+    {
+        $remotePath = trim(self::FTP_PATH, '/');
+        return sprintf('ftp://%s/%s/%s', self::FTP_HOST, $remotePath, self::ZIP_FILENAME);
     }
 }
