@@ -124,7 +124,7 @@ class BaseDadosCaEpi
                     continue;
                 }
 
-                $colunas = str_getcsv($linha, '|', '"');
+                $colunas = str_getcsv($linha, '|', '"', '\\');
                 if (count($colunas) > self::COLUMN_COUNT) {
                     $tratado = $this->tratarCasComErros($linha);
                     if ($tratado['success']) {
