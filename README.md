@@ -1,6 +1,8 @@
-# Sistema CAEPI (versão PHP)
+# API para obter os CA dos EPIs (versão PHP)
 
-Esta API expõe consultas rápidas à base pública de Certificados de Aprovação (CAEPI) publicada diariamente pelo Ministério do Trabalho. A aplicação foi reescrita em PHP puro (sem Docker) mantendo o mesmo conjunto de rotas da versão anterior em Python.
+Esta API expõe consultas rápidas à base pública de Certificados de Aprovação (CAEPI) publicada diariamente pelo Ministério do Trabalho. 
+
+A aplicação é um fork e foi reescrita em PHP puro (sem Docker) mantendo o mesmo conjunto de rotas da versão anterior em Python.
 
 ## Principais funcionalidades
 - Buscar os dados atuais de um CA (`GET /CA/{ca}`)
