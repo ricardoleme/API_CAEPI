@@ -39,6 +39,10 @@ class BaseDadosCaEpi
             return true;
         }
 
+        if (!$this->timestampDisponivel()) {
+            $this->sincronizarTimestampComArquivoBase();
+        }
+
         $ultimaAtualizacao = $this->recuperarTimestampAtualizacao();
         return (time() - $ultimaAtualizacao) > self::SECONDS_TTL;
     }
@@ -49,9 +53,11 @@ class BaseDadosCaEpi
         $this->apagarArquivoSeExistir(self::BASE_FILENAME);
         $this->apagarArquivoSeExistir(self::ZIP_FILENAME);
 
+        $this->logDownload('Iniciando download da base CAEPI via FTP.');
         $this->downloadArquivoZip($zipPath);
         $this->extrairZip($zipPath);
         $this->atualizarTimestampArquivoBase();
+        $this->logDownload('Download concluído e arquivo base atualizado.');
         @unlink($zipPath);
     }
 
@@ -394,6 +400,26 @@ class BaseDadosCaEpi
         return file_exists($this->path(self::BASE_FILENAME));
     }
 
+    private function timestampDisponivel(): bool
+    {
+        return file_exists($this->path(self::TIMESTAMP_FILENAME));
+    }
+
+    private function sincronizarTimestampComArquivoBase(): void
+    {
+        $arquivoBase = $this->path(self::BASE_FILENAME);
+        if (!file_exists($arquivoBase)) {
+            return;
+        }
+
+        $modificacao = filemtime($arquivoBase);
+        if ($modificacao === false) {
+            return;
+        }
+
+        @file_put_contents($this->path(self::TIMESTAMP_FILENAME), (string) $modificacao);
+    }
+
     private function path(string $arquivo): string
     {
         return rtrim($this->rootPath, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $arquivo;
@@ -411,5 +437,10 @@ class BaseDadosCaEpi
     {
         $remotePath = trim(self::FTP_PATH, '/');
         return sprintf('ftp://%s/%s/%s', self::FTP_HOST, $remotePath, self::ZIP_FILENAME);
+    }
+
+    private function logDownload(string $mensagem): void
+    {
+        error_log('[BaseDadosCaEpi] ' . $mensagem);
     }
 }
