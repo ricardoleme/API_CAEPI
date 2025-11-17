@@ -18,6 +18,7 @@ class BaseDadosCaEpi
     private const FTP_PATH = 'portal/fiscalizacao/seguranca-e-saude-no-trabalho/caepi/';
     private const COLUMN_COUNT = 19;
     private const SECONDS_TTL = 24 * 60 * 60;
+    private const TIMESTAMP_FILENAME = 'tgg_export_caepi.timestamp';
 
     public function __construct(private readonly string $rootPath)
     {
@@ -34,12 +35,11 @@ class BaseDadosCaEpi
 
     private function precisaAtualizarBase(): bool
     {
-        $arquivoBase = $this->path(self::BASE_FILENAME);
-        if (!file_exists($arquivoBase)) {
+        if (!$this->arquivoBaseDisponivel()) {
             return true;
         }
 
-        $ultimaAtualizacao = filemtime($arquivoBase) ?: 0;
+        $ultimaAtualizacao = $this->recuperarTimestampAtualizacao();
         return (time() - $ultimaAtualizacao) > self::SECONDS_TTL;
     }
 
@@ -51,6 +51,7 @@ class BaseDadosCaEpi
 
         $this->downloadArquivoZip($zipPath);
         $this->extrairZip($zipPath);
+        $this->atualizarTimestampArquivoBase();
         @unlink($zipPath);
     }
 
@@ -361,6 +362,36 @@ class BaseDadosCaEpi
         if (!$concluido) {
             throw new RuntimeException('Fim inesperado ao processar o ZIP sem índice central.');
         }
+    }
+
+    private function atualizarTimestampArquivoBase(): void
+    {
+        $arquivoBase = $this->path(self::BASE_FILENAME);
+        if (file_exists($arquivoBase)) {
+            @touch($arquivoBase);
+        }
+
+        $arquivoTimestamp = $this->path(self::TIMESTAMP_FILENAME);
+        @file_put_contents($arquivoTimestamp, (string) time());
+    }
+
+    private function recuperarTimestampAtualizacao(): int
+    {
+        $arquivoTimestamp = $this->path(self::TIMESTAMP_FILENAME);
+        if (file_exists($arquivoTimestamp)) {
+            $conteudo = trim((string) file_get_contents($arquivoTimestamp));
+            if ($conteudo !== '' && ctype_digit($conteudo)) {
+                return (int) $conteudo;
+            }
+        }
+
+        $arquivoBase = $this->path(self::BASE_FILENAME);
+        return file_exists($arquivoBase) ? (filemtime($arquivoBase) ?: 0) : 0;
+    }
+
+    private function arquivoBaseDisponivel(): bool
+    {
+        return file_exists($this->path(self::BASE_FILENAME));
     }
 
     private function path(string $arquivo): string
